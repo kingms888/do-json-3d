@@ -1,0 +1,578 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.5, user-scalable=yes">
+  <title>JSON 驱动的 3D 场景编辑器 · 纯前端 · Three.js</title>
+  <meta name="description" content="使用 JSON 结构快速构建 3D 场景，零 Three.js 编码。面向 3D 开发者、AI 内容生成与 3D 打印爱好者。">
+  <meta name="keywords" content="json 3d editor, three.js json, ai 3d scene, data-driven 3d, 3d printing tool">
+  <meta name="author" content="3D Scene Builder">
+  <meta property="og:title" content="JSON 驱动的 3D 场景编辑器（纯前端）">
+  <meta property="og:description" content="用 JSON 描述 3D 场景，即时预览。适合 AI 生成、3D 打印与快速原型。">
+  <meta property="og:type" content="website">
+  <meta name="twitter:card" content="summary_large_image">
+  <style>
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+    body {
+      font-family: 'Segoe UI', Roboto, system-ui, -apple-system, sans-serif;
+      background: #f5f7fc;
+      color: #1e293b;
+      padding: 1rem;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+    }
+    .app-wrapper {
+      max-width: 1400px;
+      width: 100%;
+      background: white;
+      border-radius: 2rem;
+      box-shadow: 0 20px 40px rgba(0,0,0,0.08);
+      padding: 1.5rem 1.5rem 2rem;
+      margin-top: 0.5rem;
+    }
+    h1 {
+      font-size: 1.8rem;
+      font-weight: 600;
+      letter-spacing: -0.02em;
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      flex-wrap: wrap;
+    }
+    .subhead {
+      color: #475569;
+      margin-top: 0.2rem;
+      margin-bottom: 1.5rem;
+      border-left: 4px solid #3b82f6;
+      padding-left: 1rem;
+      font-weight: 400;
+      font-size: 1rem;
+    }
+    .grid-2col {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 1.5rem;
+    }
+    @media (max-width: 800px) {
+      .grid-2col {
+        grid-template-columns: 1fr;
+        gap: 1.2rem;
+      }
+      .app-wrapper {
+        padding: 1rem;
+      }
+      h1 {
+        font-size: 1.5rem;
+      }
+    }
+    .editor-panel {
+      background: #f8fafc;
+      border-radius: 1.2rem;
+      padding: 1.2rem;
+      box-shadow: inset 0 1px 4px rgba(0,0,0,0.02);
+    }
+    .editor-panel label {
+      font-weight: 500;
+      font-size: 0.85rem;
+      text-transform: uppercase;
+      letter-spacing: 0.02em;
+      color: #475569;
+      display: block;
+      margin-bottom: 0.4rem;
+    }
+    textarea {
+      width: 100%;
+      height: 340px;
+      font-family: 'JetBrains Mono', 'Fira Code', monospace;
+      font-size: 0.85rem;
+      background: #0f172a;
+      color: #e2e8f0;
+      border: none;
+      border-radius: 1rem;
+      padding: 1rem;
+      resize: vertical;
+      tab-size: 2;
+      line-height: 1.5;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+    }
+    textarea:focus {
+      outline: 2px solid #3b82f6;
+      outline-offset: 2px;
+    }
+    .action-bar {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.6rem 0.8rem;
+      margin-top: 1rem;
+      align-items: center;
+    }
+    .btn {
+      background: white;
+      border: 1px solid #cbd5e1;
+      padding: 0.5rem 1.2rem;
+      border-radius: 2rem;
+      font-weight: 500;
+      font-size: 0.9rem;
+      cursor: pointer;
+      transition: 0.15s;
+      box-shadow: 0 1px 2px rgba(0,0,0,0.02);
+      display: inline-flex;
+      align-items: center;
+      gap: 0.3rem;
+    }
+    .btn-primary {
+      background: #1e293b;
+      border: 1px solid #1e293b;
+      color: white;
+    }
+    .btn-primary:hover {
+      background: #0f172a;
+    }
+    .btn-outline {
+      background: transparent;
+      border: 1px solid #3b82f6;
+      color: #1e4b8a;
+    }
+    .btn-outline:hover {
+      background: #eef2ff;
+    }
+    .btn:hover {
+      transform: translateY(-1px);
+      box-shadow: 0 4px 8px rgba(0,0,0,0.05);
+    }
+    .scene-container {
+      background: #eef2f6;
+      border-radius: 1.2rem;
+      overflow: hidden;
+      aspect-ratio: 4/3;
+      min-height: 300px;
+      position: relative;
+      box-shadow: 0 2px 12px rgba(0,0,0,0.04);
+    }
+    #threeCanvas {
+      width: 100%;
+      height: 100%;
+      display: block;
+      background: #f1f5f9;
+    }
+    .placeholder-ad {
+      margin-top: 1.5rem;
+      background: #f1f5f9;
+      border-radius: 2rem;
+      padding: 0.8rem 1.5rem;
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      justify-content: space-between;
+      border: 1px dashed #cbd5e1;
+      color: #475569;
+      font-size: 0.9rem;
+    }
+    .placeholder-ad span {
+      opacity: 0.7;
+    }
+    .placeholder-ad .ad-zone {
+      background: white;
+      padding: 0.2rem 1rem;
+      border-radius: 30px;
+      border: 1px solid #d1d9e6;
+      font-size: 0.8rem;
+    }
+    .affiliate-resources {
+      margin-top: 1.5rem;
+      background: #f1f5f9;
+      border-radius: 1.5rem;
+      padding: 1rem 1.5rem;
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      justify-content: space-between;
+    }
+    .affiliate-resources a {
+      color: #1e4b8a;
+      text-decoration: none;
+      font-weight: 500;
+      border-bottom: 1px dotted #94a3b8;
+    }
+    .affiliate-resources a:hover {
+      color: #0f2b4f;
+    }
+    .privacy-note {
+      margin-top: 1.8rem;
+      font-size: 0.75rem;
+      color: #64748b;
+      background: #f8fafc;
+      padding: 0.5rem 1rem;
+      border-radius: 40px;
+      display: inline-block;
+      border: 1px solid #e2e8f0;
+    }
+    .status-badge {
+      font-size: 0.8rem;
+      background: #dbeafe;
+      color: #1e4b8a;
+      padding: 0.2rem 0.8rem;
+      border-radius: 30px;
+      margin-left: 0.5rem;
+    }
+    .footer-meta {
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: space-between;
+      align-items: center;
+      margin-top: 0.8rem;
+    }
+    .sample-label {
+      background: #e2e8f0;
+      border-radius: 30px;
+      padding: 0.2rem 1rem;
+      font-size: 0.7rem;
+      font-weight: 600;
+      color: #334155;
+    }
+  </style>
+</head>
+<body>
+<div class="app-wrapper">
+  <header>
+    <h1>
+      🧊 JSON 3D 场景编辑器
+      <span class="status-badge">纯前端 · Three.js</span>
+    </h1>
+    <div class="subhead">
+      结构化 JSON → 实时 3D 场景 · 面向 AI 生成 / 3D 打印 · 零编码
+    </div>
+  </header>
+
+  <div class="grid-2col">
+    <!-- 左: 编辑器 -->
+    <section class="editor-panel" aria-label="JSON 场景编辑器">
+      <label for="jsonInput">📐 场景 JSON <span style="font-weight:400; text-transform:none; letter-spacing:0;">(支持 box, sphere, cylinder, 位置/颜色/尺寸)</span></label>
+      <textarea id="jsonInput" spellcheck="false" aria-label="JSON 场景描述">[
+  {
+    "type": "box",
+    "position": [0, 0.5, 0],
+    "color": "#4f8cf7",
+    "size": [1, 1, 1]
+  },
+  {
+    "type": "sphere",
+    "position": [1.8, 0.5, -1],
+    "color": "#f472b6",
+    "size": 0.6
+  },
+  {
+    "type": "cylinder",
+    "position": [-1.8, 0.2, 1.2],
+    "color": "#fbbf24",
+    "size": [0.5, 0.5, 1.2]
+  },
+  {
+    "type": "box",
+    "position": [0.8, 0.2, -2],
+    "color": "#34d399",
+    "size": [0.4, 0.4, 0.4]
+  }
+]</textarea>
+      <div class="action-bar">
+        <button class="btn btn-primary" id="renderBtn">▶ 渲染场景</button>
+        <button class="btn btn-outline" id="resetViewBtn">⟲ 重置视角</button>
+        <button class="btn" id="exampleBtn">📋 加载示例</button>
+        <span class="sample-label">支持 3 种几何体</span>
+      </div>
+      <p style="margin-top: 0.6rem; font-size:0.8rem; color:#475569;">
+        💡 编辑 JSON 后点击「渲染场景」 • 几何体: box, sphere, cylinder
+      </p>
+    </section>
+
+    <!-- 右: 3D 预览 -->
+    <section aria-label="3D 场景预览">
+      <div class="scene-container" id="sceneContainer">
+        <canvas id="threeCanvas"></canvas>
+      </div>
+      <div style="margin-top: 0.5rem; display: flex; justify-content: flex-end; font-size:0.75rem; color:#64748b;">
+        <span>🖱 拖拽旋转 · 滚轮缩放</span>
+      </div>
+    </section>
+  </div>
+
+  <!-- 广告占位 (可见) -->
+  <div class="placeholder-ad" aria-label="广告占位">
+    <span>📢 赞助商占位 —— 您的 3D 打印服务 / AI 工具</span>
+    <span class="ad-zone">ad · 联系</span>
+  </div>
+
+  <!-- 联盟/资源区 -->
+  <div class="affiliate-resources">
+    <span>🔗 推荐资源：</span>
+    <a href="#" target="_blank" rel="noopener">Three.js 官方文档</a>
+    <a href="#" target="_blank" rel="noopener">JSON 3D 场景规范草案</a>
+    <a href="#" target="_blank" rel="noopener">3D 打印模型优化</a>
+    <span style="color:#94a3b8; font-size:0.8rem;">(联盟链接)</span>
+  </div>
+
+  <!-- 隐私说明 + 事件上报 -->
+  <div class="footer-meta">
+    <div class="privacy-note">
+      🔒 匿名事件统计用于产品改进。无追踪，无凭据收集。
+    </div>
+    <div style="font-size:0.7rem; color:#94a3b8;">
+      v1.0 · JSON 3D Editor
+    </div>
+  </div>
+</div>
+
+<script>
+  (function() {
+    // ---------- 全局上报函数 ----------
+    window.reportEvent = function(name, payload) {
+      if (typeof window.ORGANISM_METRICS_ENDPOINT === 'string' && window.ORGANISM_METRICS_ENDPOINT.length > 0) {
+        try {
+          const body = JSON.stringify({ event: name, payload: payload || {}, timestamp: Date.now() });
+          fetch(window.ORGANISM_METRICS_ENDPOINT, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: body,
+            mode: 'cors' // 匿名上报，无需凭证
+          }).catch(() => {}); // 静默失败
+        } catch (e) { /* ignore */ }
+      }
+    };
+
+    // 配置端点示例 (若未配置则不发送)
+    // window.ORGANISM_METRICS_ENDPOINT = 'https://example.com/metrics';  // 可取消注释测试
+
+    // ---------- Three.js 场景 ----------
+    let scene, camera, renderer, controls;
+    let canvas = document.getElementById('threeCanvas');
+    const container = document.getElementById('sceneContainer');
+
+    // 初始化场景
+    function initThree() {
+      scene = new THREE.Scene();
+      scene.background = new THREE.Color(0xf1f5f9);
+
+      camera = new THREE.PerspectiveCamera(45, container.clientWidth / container.clientHeight, 0.1, 100);
+      camera.position.set(4, 3, 6);
+      camera.lookAt(0, 0, 0);
+
+      renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
+      renderer.setSize(container.clientWidth, container.clientHeight);
+      renderer.shadowMap.enabled = true;
+      renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+      renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+
+      // 灯光
+      const ambientLight = new THREE.AmbientLight(0xffffff, 0.5);
+      scene.add(ambientLight);
+
+      const dirLight = new THREE.DirectionalLight(0xffffff, 1.2);
+      dirLight.position.set(5, 10, 7);
+      dirLight.castShadow = true;
+      dirLight.shadow.mapSize.width = 1024;
+      dirLight.shadow.mapSize.height = 1024;
+      scene.add(dirLight);
+
+      const fillLight = new THREE.DirectionalLight(0xffeedd, 0.6);
+      fillLight.position.set(-3, 1, 4);
+      scene.add(fillLight);
+
+      // 地面网格 (辅助)
+      const gridHelper = new THREE.GridHelper(8, 12, 0x3b82f6, 0x94a3b8);
+      gridHelper.position.y = -0.01;
+      scene.add(gridHelper);
+
+      // 简单轨道控制 (使用 Three.js 官方 OrbitControls)
+      controls = new THREE.OrbitControls(camera, renderer.domElement);
+      controls.enableDamping = true;
+      controls.dampingFactor = 0.08;
+      controls.autoRotate = false;
+      controls.target.set(0, 0.5, 0);
+      controls.update();
+
+      // 响应式
+      window.addEventListener('resize', onResize);
+      animate();
+      reportEvent('scene_initialized', {});
+    }
+
+    function onResize() {
+      const w = container.clientWidth;
+      const h = container.clientHeight;
+      camera.aspect = w / h;
+      camera.updateProjectionMatrix();
+      renderer.setSize(w, h);
+    }
+
+    function animate() {
+      requestAnimationFrame(animate);
+      controls.update();
+      renderer.render(scene, camera);
+    }
+
+    // ---------- 构建场景 (根据 JSON) ----------
+    function buildSceneFromJSON(jsonString) {
+      // 清除旧物体 (保留 grid, light)
+      const toRemove = [];
+      scene.children.forEach(child => {
+        if (child.isMesh || child.isLineSegments || (child.isObject3D && child.userData.isBuildObject)) {
+          toRemove.push(child);
+        }
+      });
+      toRemove.forEach(obj => scene.remove(obj));
+
+      let objectsData;
+      try {
+        objectsData = JSON.parse(jsonString);
+        if (!Array.isArray(objectsData)) throw new Error('需要数组');
+      } catch (e) {
+        alert('JSON 解析错误: ' + e.message);
+        reportEvent('json_parse_error', { error: e.message });
+        return;
+      }
+
+      let count = 0;
+      objectsData.forEach((item, index) => {
+        if (!item.type) return;
+        let geometry, material;
+        const color = item.color || '#cccccc';
+        const pos = item.position || [0, 0, 0];
+        const size = item.size || [0.5, 0.5, 0.5];
+
+        // 根据 type 创建几何体
+        switch (item.type.toLowerCase()) {
+          case 'box':
+            if (Array.isArray(size)) {
+              geometry = new THREE.BoxGeometry(size[0] || 0.5, size[1] || 0.5, size[2] || 0.5);
+            } else {
+              geometry = new THREE.BoxGeometry(size, size, size);
+            }
+            break;
+          case 'sphere':
+            const radius = Array.isArray(size) ? (size[0] || 0.5) : (size || 0.5);
+            geometry = new THREE.SphereGeometry(radius, 32, 24);
+            break;
+          case 'cylinder':
+            let radiusTop, radiusBottom, height;
+            if (Array.isArray(size)) {
+              radiusTop = size[0] || 0.4;
+              radiusBottom = size[1] || 0.4;
+              height = size[2] || 0.8;
+            } else {
+              radiusTop = size * 0.8;
+              radiusBottom = size * 0.8;
+              height = size;
+            }
+            geometry = new THREE.CylinderGeometry(radiusTop, radiusBottom, height, 28);
+            break;
+          default:
+            // 未知类型跳过
+            return;
+        }
+
+        material = new THREE.MeshStandardMaterial({
+          color: color,
+          roughness: 0.3,
+          metalness: 0.1,
+          emissive: new THREE.Color(0x000000),
+        });
+        const mesh = new THREE.Mesh(geometry, material);
+        mesh.position.set(pos[0] || 0, pos[1] || 0, pos[2] || 0);
+        mesh.castShadow = true;
+        mesh.receiveShadow = true;
+        mesh.userData.isBuildObject = true;
+        scene.add(mesh);
+        count++;
+      });
+
+      // 添加微弱的坐标轴指示 (小物体)
+      reportEvent('scene_rendered', { objectCount: count });
+    }
+
+    // ---------- 重置视角 ----------
+    function resetCamera() {
+      camera.position.set(4, 3, 6);
+      controls.target.set(0, 0.5, 0);
+      controls.update();
+      reportEvent('view_reset', {});
+    }
+
+    // ---------- 加载默认示例 ----------
+    function loadExample() {
+      const example = `[
+  {
+    "type": "box",
+    "position": [0, 0.5, 0],
+    "color": "#4f8cf7",
+    "size": [1, 1, 1]
+  },
+  {
+    "type": "sphere",
+    "position": [1.8, 0.5, -1],
+    "color": "#f472b6",
+    "size": 0.6
+  },
+  {
+    "type": "cylinder",
+    "position": [-1.8, 0.2, 1.2],
+    "color": "#fbbf24",
+    "size": [0.5, 0.5, 1.2]
+  },
+  {
+    "type": "box",
+    "position": [0.8, 0.2, -2],
+    "color": "#34d399",
+    "size": [0.4, 0.4, 0.4]
+  }
+]`;
+      document.getElementById('jsonInput').value = example;
+      buildSceneFromJSON(example);
+      reportEvent('example_loaded', {});
+    }
+
+    // ---------- 绑定 UI ----------
+    document.addEventListener('DOMContentLoaded', function() {
+      // 等待 Three.js 加载 (通过 CDN)
+      const script = document.createElement('script');
+      script.src = 'https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js';
+      script.onload = () => {
+        // 加载 OrbitControls
+        const scriptOrbit = document.createElement('script');
+        scriptOrbit.src = 'https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js';
+        scriptOrbit.onload = () => {
+          initThree();
+          // 默认渲染示例
+          const defaultJson = document.getElementById('jsonInput').value;
+          buildSceneFromJSON(defaultJson);
+          // 事件
+          document.getElementById('renderBtn').addEventListener('click', function() {
+            const val = document.getElementById('jsonInput').value;
+            buildSceneFromJSON(val);
+            reportEvent('render_clicked', {});
+          });
+          document.getElementById('resetViewBtn').addEventListener('click', resetCamera);
+          document.getElementById('exampleBtn').addEventListener('click', loadExample);
+        };
+        document.head.appendChild(scriptOrbit);
+      };
+      document.head.appendChild(script);
+    });
+
+    // 额外: 若端点未配置，不上报。但保留 reportEvent 函数。
+    // 隐私说明已展示。
+  })();
+</script>
+
+<section data-organism-discovery="hub" style="margin:32px auto 20px;max-width:1040px;padding:16px;border-top:1px solid #d9e2ec;color:#475569;font:14px/1.5 system-ui,-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif">
+  <strong style="display:block;color:#0f172a;margin-bottom:6px">More free browser tools</strong>
+  <p style="margin:0 0 8px">This page is part of an autonomous micro-tool network. Explore the live tool directory and related utilities.</p>
+  <p style="margin:0"><a href="https://kingms888.github.io/do-digital-organism-index/" style="color:#0f766e;font-weight:700">Open the tool directory</a> </p>
+</section>
+</body>
+</html>
